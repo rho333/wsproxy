@@ -24,34 +24,41 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/appservice"
 )
 
+func writeBlankOK(w http.ResponseWriter) {
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("{}"))
+}
+
 var (
-	errMissingToken = appservice.Error{
-		HTTPStatus: http.StatusForbidden,
-		ErrorCode:  "M_MISSING_TOKEN",
-		Message:    "Missing authorization header",
+	errMissingToken = mautrix.RespError{
+		StatusCode: http.StatusForbidden,
+		ErrCode:    "M_MISSING_TOKEN",
+		Err:        "Missing authorization header",
 	}
-	errUnknownToken = appservice.Error{
-		HTTPStatus: http.StatusForbidden,
-		ErrorCode:  "M_UNKNOWN_TOKEN",
-		Message:    "Unknown authorization token",
+	errUnknownToken = mautrix.RespError{
+		StatusCode: http.StatusForbidden,
+		ErrCode:    "M_UNKNOWN_TOKEN",
+		Err:        "Unknown authorization token",
 	}
-	errBadJSON = appservice.Error{
-		HTTPStatus: http.StatusBadRequest,
-		ErrorCode:  "M_BAD_JSON",
-		Message:    "Failed to decode request JSON",
+	errBadJSON = mautrix.RespError{
+		StatusCode: http.StatusBadRequest,
+		ErrCode:    "M_BAD_JSON",
+		Err:        "Failed to decode request JSON",
 	}
-	errSendFail = appservice.Error{
-		HTTPStatus: http.StatusBadGateway,
-		ErrorCode:  "FI.MAU.WS_SEND_FAIL",
-		Message:    "Failed to send data through websocket",
+	errSendFail = mautrix.RespError{
+		StatusCode: http.StatusBadGateway,
+		ErrCode:    "FI.MAU.WS_SEND_FAIL",
+		Err:        "Failed to send data through websocket",
 	}
-	errNotConnected = appservice.Error{
-		HTTPStatus: http.StatusBadGateway,
-		ErrorCode:  "FI.MAU.WS_NOT_CONNECTED",
-		Message:    "Endpoint is not connected to websocket",
+	errNotConnected = mautrix.RespError{
+		StatusCode: http.StatusBadGateway,
+		ErrCode:    "FI.MAU.WS_NOT_CONNECTED",
+		Err:        "Endpoint is not connected to websocket",
 	}
 )
 
@@ -93,7 +100,7 @@ func writeTransaction(w http.ResponseWriter, az *AppService, txnName, logContent
 			errSendFail.Write(w)
 		} else {
 			log.Printf("Sent %s to %s successfully", txnName, az.ID)
-			appservice.WriteBlankOK(w)
+			writeBlankOK(w)
 		}
 	} else {
 		log.Printf("Rejecting %s to %s: websocket not connected", txnName, az.ID)
@@ -133,25 +140,25 @@ func putTransaction(w http.ResponseWriter, r *http.Request) {
 }
 
 type SyncProxyError struct {
-	appservice.Error
+	mautrix.RespError
 	TxnID string `json:"txn_id"`
 }
 
 func putSyncProxyError(w http.ResponseWriter, r *http.Request) {
-	var txn appservice.Error
+	var txn mautrix.RespError
 	az := readTransaction(w, r, &txn)
 	if az == nil {
 		return
 	}
 	vars := mux.Vars(r)
 	txnID := vars["txnID"]
-	logContent := string(txn.ErrorCode)
+	logContent := txn.ErrCode
 	txnName := fmt.Sprintf("syncproxy error %s", txnID)
 	writeTransaction(w, az, txnName, logContent, &appservice.WebsocketRequest{
 		Command: "syncproxy_error",
 		Data: &SyncProxyError{
-			Error: txn,
-			TxnID: txnID,
+			RespError: txn,
+			TxnID:     txnID,
 		},
 	})
 }
