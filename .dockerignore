@@ -1,2 +1,3 @@
-config.yaml
+.git
 mautrix-wsproxy
+*.log
